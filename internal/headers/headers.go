@@ -59,7 +59,20 @@ func (h *Headers) Get(name string) string {
 }
 
 func (h *Headers) Set(name, value string) {
-	h.headers[strings.ToLower(name)] = value
+	mappedName := strings.ToLower(name)
+
+	if v, ok := h.headers[mappedName]; ok {
+		h.headers[mappedName] = fmt.Sprintf("%s,%s", v, value)
+		return
+	}
+
+	h.headers[mappedName] = value
+}
+
+func (h *Headers) ForEach(cb func(n, v string)) {
+	for name, value := range h.headers {
+		cb(name, value)
+	}
 }
 
 func (h *Headers) Parse(data []byte) (int, bool, error) {
