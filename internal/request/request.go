@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"strings"
+
+	"github.com/lghartmann/from-tcp-to-http/internal/headers"
 )
 
 type RequestLine struct {
@@ -27,13 +29,14 @@ type parserState string
 type Request struct {
 	RequestLine RequestLine
 	state       parserState
-	// Headers     map[string]string
+	Headers     *headers.Headers
 	// Body        []byte
 }
 
 func NewRequest() *Request {
 	return &Request{
-		state: StateInit,
+		state:   StateInit,
+		Headers: headers.NewHeaders(),
 	}
 }
 
@@ -41,11 +44,12 @@ func (r *Request) parse(data []byte) (int, error) {
 	read := 0
 outer:
 	for {
+		currentData := data[read:]
 		switch r.state {
 		case StateError:
 			return 0, ErrRequestInErrorState
 		case StateInit:
-			rl, n, err := parseRequestLine(data[read:])
+			rl, n, err := parseRequestLine(currentData)
 			if err != nil {
 				return 0, err
 			}
@@ -56,9 +60,26 @@ outer:
 
 			r.RequestLine = *rl
 			read += n
-			r.state = StateDone
+			r.state = StateHeaders
+		case StateHeaders:
+			n, done, err := r.Headers.Parse(currentData)
+			if err != nil {
+				return 0, err
+			}
+
+			if n == 0 {
+				break outer
+			}
+
+			read += n
+
+			if done {
+				r.state = StateDone
+			}
 		case StateDone:
 			break outer
+		default:
+			panic("somehow we have programmed poorly")
 		}
 	}
 	return read, nil
@@ -78,9 +99,10 @@ var ErrRequestInErrorState error = fmt.Errorf("request in error state")
 var SEPARATOR []byte = []byte("\r\n")
 
 const (
-	StateInit  parserState = "init"
-	StateDone  parserState = "done"
-	StateError parserState = "error"
+	StateInit    parserState = "init"
+	StateHeaders parserState = "headers"
+	StateDone    parserState = "done"
+	StateError   parserState = "error"
 )
 
 func RequestFromReader(reader io.Reader) (*Request, error) {
