@@ -51,11 +51,14 @@ var ErrorMalformedFieldLine error = fmt.Errorf("malformed field line")
 var ErrorMalformedFieldName error = fmt.Errorf("malformed field name")
 
 func NewHeaders() *Headers {
-	return &Headers{}
+	return &Headers{
+		headers: map[string]string{},
+	}
 }
 
-func (h *Headers) Get(name string) string {
-	return h.headers[strings.ToLower(name)]
+func (h *Headers) Get(name string) (string, bool) {
+	str, ok := h.headers[strings.ToLower(name)]
+	return str, ok
 }
 
 func (h *Headers) Set(name, value string) {
