@@ -64,6 +64,7 @@ func (r *Request) parse(data []byte) (int, error) {
 outer:
 	for {
 		currentData := data[read:]
+
 		switch r.state {
 		case StateError:
 			return 0, ErrRequestInErrorState
@@ -83,6 +84,7 @@ outer:
 		case StateHeaders:
 			n, done, err := r.Headers.Parse(currentData)
 			if err != nil {
+				r.state = StateError
 				return 0, err
 			}
 
@@ -93,7 +95,6 @@ outer:
 			read += n
 
 			if done {
-				// If Content-Length is present and > 0 we need to parse a body next.
 				cl := getIntHeader(r.Headers, "content-length", 0)
 				if cl > 0 {
 					r.state = StateBody
